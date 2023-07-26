@@ -2,6 +2,7 @@ export class Controller {
   pageSize: number;
   pageIndex: number;
   logs: Array<string>;
+  len: number;
 
   redisClient: any;
 
@@ -10,6 +11,7 @@ export class Controller {
     this.pageIndex = 0;
     this.logs = [];
     this.redisClient = redisClient;
+    this.len = 0;
     this.pull();
   }
 
@@ -24,6 +26,7 @@ export class Controller {
       this.logs = newLogs;
     };
     pullFunction().catch(console.error);
+    this.getLength();
   }
 
   setPageSize(size: number) {
@@ -34,5 +37,12 @@ export class Controller {
   setPageIndex(index: number) {
     this.pageIndex = index;
     this.pull();
+  }
+
+  getLength() {
+    const fetchReq = async () => {
+      this.len = await this.redisClient.get("length")
+    }
+    fetchReq().catch(console.error)
   }
 }

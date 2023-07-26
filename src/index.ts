@@ -13,7 +13,7 @@ const fetchClient = async () => {
 };
 fetchClient().catch(console.error);
 
-const controller: Controller = new Controller(client, 3);
+const controller: Controller = new Controller(client, 10);
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -24,19 +24,23 @@ const io = new Server(httpServer, {
 });
 
 io.on('connection', (socket) => {
-  console.log(`Socket ${socket.id} connected`);
+  controller.pull();
+  socket.emit('length', controller.len);
+  for (let log of controller.logs) {
+    socket.emit('data', log);
+  }
 
   socket.on('set_page', (data) => {
     controller.setPageIndex(Number(data));
     for (let log of controller.logs) {
-      socket.emit('message', log);
+      socket.emit('data', log);
     }
   });
 
   socket.on('set_size', (data) => {
     controller.setPageSize(Number(data));
     for (let log of controller.logs) {
-      socket.emit('message', log);
+      socket.emit('data', log);
     }
   });
 
@@ -49,14 +53,9 @@ io.on('connection', (socket) => {
   const subscriber = client.duplicate();
   await subscriber.connect();
 
-  await subscriber.subscribe('update', (message) => {
-    console.log(message); // 'message'
-    const sockets = io.sockets.fetchSockets();
-    for (let socket in sockets) {
-      console.log(socket);
-    }
-
+  await subscriber.subscribe('update', () => {
     controller.pull();
+    io.sockets.emit("length", controller.len);
   });
 })();
 
