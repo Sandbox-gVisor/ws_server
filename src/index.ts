@@ -26,22 +26,16 @@ const io = new Server(httpServer, {
 io.on('connection', (socket) => {
   controller.pull();
   socket.emit('length', controller.len);
-  for (let log of controller.logs) {
-    socket.emit('data', log);
-  }
+  controller.emitData(socket);
 
   socket.on('set_page', (data) => {
     controller.setPageIndex(Number(data));
-    for (let log of controller.logs) {
-      socket.emit('data', log);
-    }
+    controller.emitData(socket);
   });
 
   socket.on('set_size', (data) => {
     controller.setPageSize(Number(data));
-    for (let log of controller.logs) {
-      socket.emit('data', log);
-    }
+    controller.emitData(socket);
   });
 
   socket.on('disconnect', () => {

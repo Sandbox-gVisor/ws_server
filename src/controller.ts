@@ -1,3 +1,5 @@
+import { RemoteSocket } from "socket.io";
+
 export class Controller {
   pageSize: number;
   pageIndex: number;
@@ -44,5 +46,12 @@ export class Controller {
       this.len = await this.redisClient.get("length")
     }
     fetchReq().catch(console.error)
+  }
+
+  emitData(socket: any) {
+    const start = this.pageSize * this.pageIndex;
+    for (let i = start; i < start + this.pageSize; ++i) {
+      socket.emit('data', { index: i, log: this.logs[i - start] });
+    }
   }
 }
