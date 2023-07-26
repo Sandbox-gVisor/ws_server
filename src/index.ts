@@ -1,24 +1,43 @@
-import express from "express";
-import { createServer } from "http";
-import { Server } from "socket.io";
+import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
-import { createClient } from "redis";
+import { createClient } from 'redis';
+import { Controller } from './controller';
 
+const client = createClient();
+
+client.on('error', err => console.log('Redis Client Error', err));
+const fetchClient = async () => {
+  await client.connect();
+}
+fetchClient().catch(console.error);
+
+const controller: Controller = new Controller(client, 3);
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
 });
 
 io.on('connection', (socket) => {
   console.log(`Socket ${socket.id} connected`);
 
-  socket.on('message', (data) => {
-    console.log(`Received message: ${data}`);
-    socket.send("no sex");
+  socket.on('set_page', (data) => {
+    controller.setPageIndex(Number(data));
+    for (let log of controller.logs) {
+      socket.emit("message", log);
+    }
+  });
+
+  socket.on('set_size', (data) => {
+    controller.setPageSize(Number(data));
+    for (let log of controller.logs) {
+      socket.emit("message", log);
+    }
   });
 
   socket.on('disconnect', () => {
@@ -26,24 +45,22 @@ io.on('connection', (socket) => {
   });
 });
 
-
 (async () => {
-
-  const client = createClient();
-
   const subscriber = client.duplicate();
-
   await subscriber.connect();
 
   await subscriber.subscribe('update', (message) => {
     console.log(message); // 'message'
-    const sockets = io.sockets.fetchSockets()
+    const sockets = io.sockets.fetchSockets();
     for (let socket in sockets) {
       console.log(socket);
     }
-    io.sockets.send(message);
-  });
 
+    controller.pull();
+    for (let log of controller.logs) {
+      io.sockets.emit("message", log);
+    }
+  });
 })();
 
 httpServer.listen(3001, () => {
