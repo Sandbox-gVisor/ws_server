@@ -1,16 +1,16 @@
 import express from 'express';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
+import {createServer} from 'http';
+import {Server} from 'socket.io';
 
-import { createClient } from 'redis';
-import { Controller } from './controller';
+import {createClient} from 'redis';
+import {Controller} from './controller';
 
 const client = createClient();
 
-client.on('error', err => console.log('Redis Client Error', err));
+client.on('error', (err) => console.log('Redis Client Error', err));
 const fetchClient = async () => {
   await client.connect();
-}
+};
 fetchClient().catch(console.error);
 
 const controller: Controller = new Controller(client, 3);
@@ -29,14 +29,14 @@ io.on('connection', (socket) => {
   socket.on('set_page', (data) => {
     controller.setPageIndex(Number(data));
     for (let log of controller.logs) {
-      socket.emit("message", log);
+      socket.emit('message', log);
     }
   });
 
   socket.on('set_size', (data) => {
     controller.setPageSize(Number(data));
     for (let log of controller.logs) {
-      socket.emit("message", log);
+      socket.emit('message', log);
     }
   });
 
@@ -58,7 +58,7 @@ io.on('connection', (socket) => {
 
     controller.pull();
     for (let log of controller.logs) {
-      io.sockets.emit("message", log);
+      io.sockets.emit('message', log);
     }
   });
 })();

@@ -1,4 +1,3 @@
-
 export class Controller {
   pageSize: number;
   pageIndex: number;
@@ -19,11 +18,11 @@ export class Controller {
       let newLogs: Array<string> = [];
       const start = this.pageIndex * this.pageSize;
       for (let i = start; i < start + this.pageSize; ++i) {
-        const log = await this.redisClient.get("" + i);
+        const log = await this.redisClient.get('' + i);
         newLogs.push(log);
       }
       this.logs = newLogs;
-    }
+    };
     pullFunction().catch(console.error);
   }
 
@@ -36,6 +35,4 @@ export class Controller {
     this.pageIndex = index;
     this.pull();
   }
-};
-
-
+}
