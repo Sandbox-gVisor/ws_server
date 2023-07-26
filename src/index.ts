@@ -1,9 +1,9 @@
 import express from 'express';
-import {createServer} from 'http';
-import {Server} from 'socket.io';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
-import {createClient} from 'redis';
-import {Controller} from './controller';
+import { createClient } from 'redis';
+import { Controller } from './controller';
 
 const client = createClient();
 
@@ -57,9 +57,6 @@ io.on('connection', (socket) => {
     }
 
     controller.pull();
-    for (let log of controller.logs) {
-      io.sockets.emit('message', log);
-    }
   });
 })();
 
