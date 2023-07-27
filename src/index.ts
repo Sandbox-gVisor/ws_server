@@ -5,7 +5,7 @@ import { Server } from 'socket.io';
 import { createClient } from 'redis';
 import { Controller } from './controller';
 
-const client = createClient({ url: 'redis://redis:6380' });
+const client = createClient({ url: 'redis://redis:6379' });
 
 client.on('error', (err) => console.log('Redis Client Error', err));
 const fetchClient = async () => {
