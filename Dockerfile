@@ -3,7 +3,7 @@ FROM node:18-alpine
 
 # Create add dir
 WORKDIR /usr/src/app
-dok
+
 # Copying package.json and package-lock.json
 COPY package*.json .
 
