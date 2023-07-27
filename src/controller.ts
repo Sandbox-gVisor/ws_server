@@ -1,57 +1,100 @@
-import { RemoteSocket } from "socket.io";
+import { Filter, checkSuggest, defaultFilter } from "./filter";
+import { TLog, TMessege, messageToLog } from "./log";
 
 export class Controller {
   pageSize: number;
   pageIndex: number;
-  logs: Array<string>;
+  logs: Array<TLog>;
   len: number;
+  filter: Filter;
+  currentLength: number; // only for filter applyed
 
   redisClient: any;
 
   constructor(redisClient: any, size: number) {
+    this.redisClient = redisClient;
+    this.filter = defaultFilter;
+
     this.pageSize = size;
     this.pageIndex = 0;
     this.logs = [];
-    this.redisClient = redisClient;
     this.len = 0;
-    this.pull();
+    this.currentLength = 0;
+
+    this.Pull();
   }
 
-  pull() {
+  setFilter(filter: Filter) {
+    this.filter = filter;
     const pullFunction = async () => {
-      let newLogs: Array<string> = [];
-      const start = this.pageIndex * this.pageSize;
+      let newLen: number = 0;
+      for (let i = 0; i < this.len; ++i) {
+        const msgString = await this.redisClient.get('' + i);
+        const log: TLog = messageToLog(JSON.parse(msgString));
+        console.log(log);
+        if (checkSuggest(log, this.filter)) {
+          console.log(newLen);
+          await this.redisClient.set("f" + newLen, msgString);
+          newLen++;
+        }
+      }
+      this.currentLength = newLen;
+    };
+    pullFunction().catch(console.error);
+  }
+
+  pull(prefix: string) {
+    const start = this.pageIndex * this.pageSize;
+    const pullFunction = async () => {
+      let newLogs: Array<TLog> = [];
       for (let i = start; i < start + this.pageSize; ++i) {
-        const log = await this.redisClient.get('' + i);
-        newLogs.push(log);
+        const logString = await this.redisClient.get(prefix + i);
+        if (!JSON.parse(logString)) {
+          console.log(logString)
+          continue;
+        }
+        const msg: TMessege = JSON.parse(logString);
+        newLogs.push(messageToLog(msg));
       }
       this.logs = newLogs;
     };
     pullFunction().catch(console.error);
     this.getLength();
   }
+  /** pull()
+  * Read data, apply filters */
+  Pull() {
+    if (this.filter.applyed) {
+      this.pull("f");
+    } else {
+      this.pull("");
+    }
+  }
 
   setPageSize(size: number) {
     this.pageSize = size;
-    this.pull();
+    this.Pull();
   }
 
   setPageIndex(index: number) {
     this.pageIndex = index;
-    this.pull();
+    this.Pull();
   }
 
   getLength() {
     const fetchReq = async () => {
       this.len = await this.redisClient.get("length")
+      this.currentLength = this.len;
     }
     fetchReq().catch(console.error)
   }
 
   emitData(socket: any) {
-    const start = this.pageSize * this.pageIndex;
-    for (let i = start; i < start + this.pageSize; ++i) {
-      socket.emit('data', { index: i, log: this.logs[i - start] });
-    }
+    socket.emit('data', this.logs);
+    this.emitLen(socket);
+  }
+
+  emitLen(socket: any) {
+    socket.emit("length", this.currentLength);
   }
 }

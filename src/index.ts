@@ -24,9 +24,16 @@ const io = new Server(httpServer, {
 });
 
 io.on('connection', (socket) => {
-  controller.pull();
-  socket.emit('length', controller.len);
+  controller.Pull();
+  controller.emitLen(socket);
   controller.emitData(socket);
+
+  socket.on("filter", (data) => {
+    controller.setFilter(data)
+    controller.Pull();
+    controller.emitLen(io.sockets);
+    controller.emitData(socket);
+  });
 
   socket.on('set_page', (data) => {
     controller.setPageIndex(Number(data));
@@ -48,8 +55,8 @@ io.on('connection', (socket) => {
   await subscriber.connect();
 
   await subscriber.subscribe('update', () => {
-    controller.pull();
-    io.sockets.emit("length", controller.len);
+    controller.Pull();
+    controller.emitLen(io.sockets);
   });
 })();
 
