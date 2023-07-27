@@ -24,12 +24,14 @@ const io = new Server(httpServer, {
 });
 
 io.on('connection', (socket) => {
-  controller.pull();
+  controller.Pull();
   controller.emitLen(socket);
   controller.emitData(socket);
 
   socket.on("filter", (data) => {
-    controller.filter = data;
+    controller.setFilter(data)
+    controller.Pull();
+    controller.emitLen(io.sockets);
     controller.emitData(socket);
   });
 
@@ -53,7 +55,7 @@ io.on('connection', (socket) => {
   await subscriber.connect();
 
   await subscriber.subscribe('update', () => {
-    controller.pull();
+    controller.Pull();
     controller.emitLen(io.sockets);
   });
 })();

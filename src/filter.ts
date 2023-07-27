@@ -30,22 +30,25 @@ export function checkSuggest(log: TLog, filter: Filter) {
   const prefixRegex = new RegExp(filter.prefix);
   const tasknameRegex = new RegExp(filter.taskname);
   const syscallnameRegex = new RegExp(filter.syscallname);
+  console.log(0);
 
-  if (!prefixRegex.test(log.LogPrefix)) return false;
-  if (!tasknameRegex.test(log.Taskname)) return false;
-  if (!syscallnameRegex.test(log.Syscallname)) return false;
+  if (filter.prefix && !prefixRegex.test(log.LogPrefix)) return false;
+  if (filter.taskname && !tasknameRegex.test(log.Taskname)) return false;
+  if (filter.syscallname && !syscallnameRegex.test(log.Syscallname)) return false;
+  console.log(1);
 
-  if (log.LogType == "enter") {
+  if (log.LogType == "E") {
     if (!filter.type.enter) return false;
   } else {
     if (!filter.type.exit) return false;
   }
+  console.log("2");
 
   if (log.level == "info") {
     if (!filter.level.info) return false;
   } else if (log.level == "debug") {
     if (!filter.level.debug) return false;
-  } else {
+  } else if (log.level == "warning") {
     if (!filter.level.warning) return false;
   }
 
