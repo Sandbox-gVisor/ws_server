@@ -1,22 +1,29 @@
-import { RemoteSocket } from "socket.io";
+import { Filter, defaultFilter } from "./filter";
 
 export class Controller {
   pageSize: number;
   pageIndex: number;
   logs: Array<string>;
   len: number;
+  filter: Filter;
+  currentLength: number; // only for filter applyed
 
   redisClient: any;
 
   constructor(redisClient: any, size: number) {
+    this.redisClient = redisClient;
+    this.filter = defaultFilter;
+
     this.pageSize = size;
     this.pageIndex = 0;
     this.logs = [];
-    this.redisClient = redisClient;
     this.len = 0;
+    this.currentLength = 0;
+
     this.pull();
   }
-
+  /** pull()
+  * Read data, apply filters */
   pull() {
     const pullFunction = async () => {
       let newLogs: Array<string> = [];
@@ -44,11 +51,16 @@ export class Controller {
   getLength() {
     const fetchReq = async () => {
       this.len = await this.redisClient.get("length")
+      this.currentLength = this.len;
     }
     fetchReq().catch(console.error)
   }
 
   emitData(socket: any) {
     socket.emit('data', this.logs);
+  }
+
+  emitLen(socket: any) {
+    socket.emit("length", this.currentLength);
   }
 }

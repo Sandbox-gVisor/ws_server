@@ -25,8 +25,13 @@ const io = new Server(httpServer, {
 
 io.on('connection', (socket) => {
   controller.pull();
-  socket.emit('length', controller.len);
+  controller.emitLen(socket);
   controller.emitData(socket);
+
+  socket.on("filter", (data) => {
+    controller.filter = data;
+    controller.emitData(socket);
+  });
 
   socket.on('set_page', (data) => {
     controller.setPageIndex(Number(data));
@@ -49,7 +54,7 @@ io.on('connection', (socket) => {
 
   await subscriber.subscribe('update', () => {
     controller.pull();
-    io.sockets.emit("length", controller.len);
+    controller.emitLen(io.sockets);
   });
 })();
 
