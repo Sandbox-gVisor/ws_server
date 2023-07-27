@@ -49,9 +49,6 @@ export class Controller {
   }
 
   emitData(socket: any) {
-    const start = this.pageSize * this.pageIndex;
-    for (let i = start; i < start + this.pageSize; ++i) {
-      socket.emit('data', { index: i, log: this.logs[i - start] });
-    }
+    socket.emit('data', this.logs);
   }
 }
