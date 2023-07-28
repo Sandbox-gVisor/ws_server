@@ -24,14 +24,11 @@ const io = new Server(httpServer, {
 });
 
 io.on('connection', (socket) => {
-  controller.Pull();
-  controller.emitLen(socket);
+  controller.getLength();
   controller.emitData(socket);
 
   socket.on("filter", (data) => {
     controller.setFilter(data)
-    controller.Pull();
-    controller.emitLen(io.sockets);
     controller.emitData(socket);
   });
 
@@ -46,6 +43,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    controller.filter.applyed = false;
     console.log(`Socket ${socket.id} disconnected`);
   });
 });
