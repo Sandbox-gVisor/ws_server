@@ -58,6 +58,7 @@ export class Controller {
       this.logs = newLogs;
     };
     pullFunction().catch(console.error);
+    console.log(this.logs[0]);
   }
   /** pull()
   * Read data, apply filters */
@@ -89,8 +90,10 @@ export class Controller {
   }
 
   emitData(socket: any) {
-    socket.emit('data', this.logs);
+    this.Pull();
+    console.log(this.logs[0]);
     this.emitLen(socket);
+    socket.emit('data', this.logs);
   }
 
   emitLen(socket: any) {
