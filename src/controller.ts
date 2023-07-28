@@ -31,26 +31,25 @@ export class Controller {
       for (let i = 0; i < this.len; ++i) {
         const msgString = await this.redisClient.get('' + i);
         const log: TLog = messageToLog(JSON.parse(msgString));
-        console.log(log);
         if (checkSuggest(log, this.filter)) {
-          console.log(newLen);
           await this.redisClient.set("f" + newLen, msgString);
           newLen++;
         }
       }
+      console.log("newLen = ", newLen);
       this.currentLength = newLen;
     };
     pullFunction().catch(console.error);
   }
 
   pull(prefix: string) {
+    console.log("prefix = ", prefix);
     const start = this.pageIndex * this.pageSize;
     const pullFunction = async () => {
       let newLogs: Array<TLog> = [];
-      for (let i = start; i < start + this.pageSize; ++i) {
+      for (let i = start; i < Math.min(start + this.pageSize, this.currentLength); ++i) {
         const logString = await this.redisClient.get(prefix + i);
         if (!JSON.parse(logString)) {
-          console.log(logString)
           continue;
         }
         const msg: TMessege = JSON.parse(logString);
@@ -59,7 +58,6 @@ export class Controller {
       this.logs = newLogs;
     };
     pullFunction().catch(console.error);
-    this.getLength();
   }
   /** pull()
   * Read data, apply filters */
@@ -68,6 +66,7 @@ export class Controller {
       this.pull("f");
     } else {
       this.pull("");
+      this.getLength();
     }
   }
 

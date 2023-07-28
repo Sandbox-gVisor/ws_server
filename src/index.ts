@@ -31,7 +31,7 @@ io.on('connection', (socket) => {
   socket.on("filter", (data) => {
     controller.setFilter(data)
     controller.Pull();
-    controller.emitLen(io.sockets);
+    controller.emitLen(socket);
     controller.emitData(socket);
   });
 
