@@ -1,4 +1,10 @@
-import {Filter, checkSuggest, defaultFilter} from './filter';
+import {
+	TFilter,
+	checkSuggest,
+	defaultFilter,
+	FilterDto,
+	toTFilter,
+} from './filter';
 import {TLog, messageToLog} from './log';
 
 export class Controller {
@@ -6,7 +12,7 @@ export class Controller {
 	pageIndex: number;
 	logs: Array<TLog>;
 	len: number;
-	filter: Filter;
+	filter: TFilter;
 	currentLength: number; // only for filter applied
 
 	redisClient: any;
@@ -22,8 +28,8 @@ export class Controller {
 		this.currentLength = 0;
 	}
 
-	async setFilter(filter: Filter) {
-		this.filter = filter;
+	async setFilter(filter: FilterDto) {
+		this.filter = toTFilter(filter);
 		let newLen: number = 0;
 		for (let i = 0; i < this.len; ++i) {
 			const msg = await this.loadMsg('', i);
@@ -66,7 +72,6 @@ export class Controller {
 		} else {
 			await this.pull('');
 		}
-		console.log(this.currentLength);
 	}
 
 	async setPageSize(size: number) {
