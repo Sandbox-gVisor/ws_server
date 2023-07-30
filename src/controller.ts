@@ -1,102 +1,96 @@
-import { Filter, checkSuggest, defaultFilter } from "./filter";
-import { TLog, TMessege, messageToLog } from "./log";
+import {Filter, checkSuggest, defaultFilter} from './filter';
+import {TLog, messageToLog} from './log';
 
 export class Controller {
-  pageSize: number;
-  pageIndex: number;
-  logs: Array<TLog>;
-  len: number;
-  filter: Filter;
-  currentLength: number; // only for filter applyed
+	pageSize: number;
+	pageIndex: number;
+	logs: Array<TLog>;
+	len: number;
+	filter: Filter;
+	currentLength: number; // only for filter applied
 
-  redisClient: any;
+	redisClient: any;
 
-  constructor(redisClient: any, size: number) {
-    this.redisClient = redisClient;
-    this.filter = defaultFilter;
+	constructor(redisClient: any, size: number) {
+		this.redisClient = redisClient;
+		this.filter = defaultFilter;
 
-    this.pageSize = size;
-    this.pageIndex = 0;
-    this.logs = [];
-    this.len = 0;
-    this.currentLength = 0;
+		this.pageSize = size;
+		this.pageIndex = 0;
+		this.logs = [];
+		this.len = 0;
+		this.currentLength = 0;
+	}
 
-    this.Pull();
-  }
+	async setFilter(filter: Filter) {
+		this.filter = filter;
+		let newLen: number = 0;
+		for (let i = 0; i < this.len; ++i) {
+			const msg = await this.loadMsg('', i);
+			if (!msg) continue;
+			const log: TLog = messageToLog(msg);
+			if (checkSuggest(log, this.filter)) {
+				await this.redisClient.set('f' + newLen, JSON.stringify(msg));
+				newLen++;
+			}
+		}
+		this.currentLength = newLen;
+	}
 
-  setFilter(filter: Filter) {
-    this.filter = filter;
-    const pullFunction = async () => {
-      let newLen: number = 0;
-      for (let i = 0; i < this.len; ++i) {
-        const msgString = await this.redisClient.get('' + i);
-        const log: TLog = messageToLog(JSON.parse(msgString));
-        if (checkSuggest(log, this.filter)) {
-          await this.redisClient.set("f" + newLen, msgString);
-          newLen++;
-        }
-      }
-      console.log("newLen = ", newLen);
-      this.currentLength = newLen;
-    };
-    pullFunction().catch(console.error);
-  }
+	async loadMsg(prefix: string, i: number) {
+		const msg = await this.redisClient.get(prefix + i);
+		return JSON.parse(msg);
+	}
 
-  pull(prefix: string) {
-    console.log("prefix = ", prefix);
-    const start = this.pageIndex * this.pageSize;
-    const pullFunction = async () => {
-      let newLogs: Array<TLog> = [];
-      for (let i = start; i < Math.min(start + this.pageSize, this.currentLength); ++i) {
-        const logString = await this.redisClient.get(prefix + i);
-        if (!JSON.parse(logString)) {
-          continue;
-        }
-        const msg: TMessege = JSON.parse(logString);
-        newLogs.push(messageToLog(msg));
-      }
-      this.logs = newLogs;
-    };
-    pullFunction().catch(console.error);
-    console.log(this.logs[0]);
-  }
-  /** pull()
-  * Read data, apply filters */
-  Pull() {
-    if (this.filter.applyed) {
-      this.pull("f");
-    } else {
-      this.pull("");
-      this.getLength();
-    }
-  }
+	async pull(prefix: string) {
+		const start = this.pageIndex * this.pageSize;
+		const finish = Math.min(start + this.pageSize, this.currentLength);
 
-  setPageSize(size: number) {
-    this.pageSize = size;
-    this.Pull();
-  }
+		let newLogs: Array<TLog> = [];
+		for (let i = start; i < finish; ++i) {
+			const msg = await this.loadMsg(prefix, i);
+			if (msg) {
+				newLogs.push(messageToLog(msg));
+			} else {
+				console.log("can't parse json");
+			}
+		}
+		this.logs = newLogs;
+	}
 
-  setPageIndex(index: number) {
-    this.pageIndex = index;
-    this.Pull();
-  }
+	/** pull()
+	 * Read data, apply filters */
+	async Pull() {
+		if (this.filter.applied) {
+			await this.pull('f');
+		} else {
+			await this.pull('');
+		}
+		console.log(this.currentLength);
+	}
 
-  getLength() {
-    const fetchReq = async () => {
-      this.len = await this.redisClient.get("length")
-      this.currentLength = this.len;
-    }
-    fetchReq().catch(console.error)
-  }
+	async setPageSize(size: number) {
+		this.pageSize = size;
+		await this.Pull();
+	}
 
-  emitData(socket: any) {
-    this.Pull();
-    console.log(this.logs[0]);
-    this.emitLen(socket);
-    socket.emit('data', this.logs);
-  }
+	async setPageIndex(index: number) {
+		this.pageIndex = index;
+		await this.Pull();
+	}
 
-  emitLen(socket: any) {
-    socket.emit("length", this.currentLength);
-  }
+	async getLength() {
+		this.len = await this.redisClient.get('length');
+		this.currentLength = this.len;
+	}
+
+	async emitData(socket: any) {
+		await this.Pull();
+		this.emitLen(socket);
+		socket.emit('data', this.logs);
+	}
+
+	emitLen(socket: any) {
+		socket.emit('length', this.currentLength);
+	}
 }
