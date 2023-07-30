@@ -25,16 +25,30 @@ export const defaultFilter: Filter = {
 	syscallname: '',
 };
 
-export function checkSuggest(log: TLog, filter: Filter) {
-	if (!filter.applied) return true;
-	const prefixRegex = new RegExp(filter.prefix);
-	const tasknameRegex = new RegExp(filter.taskname);
-	const syscallnameRegex = new RegExp(filter.syscallname);
-
-	if (filter.prefix && !prefixRegex.test(log.LogPrefix)) return false;
-	if (filter.taskname && !tasknameRegex.test(log.Taskname)) return false;
-	if (filter.syscallname && !syscallnameRegex.test(log.Syscallname))
+const regexIsValid = (regex: string) => {
+	try {
+		new RegExp(regex);
+		return true;
+	} catch (error) {
+		console.log('cant parse regex, ignore');
 		return false;
+	}
+};
+
+export function checkSuggest(log: TLog, filter: Filter) {
+	// TODO not parse regex every check
+	if (filter.prefix && regexIsValid(filter.prefix)) {
+		const prefixRegex = new RegExp(filter.prefix);
+		if (!prefixRegex.test(log.LogPrefix)) return false;
+	}
+	if (filter.taskname && regexIsValid(filter.taskname)) {
+		const tasknameRegex = new RegExp(filter.taskname);
+		if (!tasknameRegex.test(log.Taskname)) return false;
+	}
+	if (filter.syscallname && regexIsValid(filter.syscallname)) {
+		const syscallnameRegex = new RegExp(filter.syscallname);
+		if (!syscallnameRegex.test(log.Syscallname)) return false;
+	}
 
 	if (log.LogType == 'E') {
 		if (!filter.type.enter) return false;
