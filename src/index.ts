@@ -54,9 +54,10 @@ io.on('connection', async (socket) => {
 	const subscriber = client.duplicate();
 	await subscriber.connect();
 
-	await subscriber.subscribe('update', () => {
-		controller.Pull();
+	await subscriber.subscribe('update', async () => {
+		await controller.getLength();
 		controller.emitLen(io.sockets);
+		await controller.emitData(io.sockets);
 	});
 })();
 
