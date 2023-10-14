@@ -1,28 +1,70 @@
 package main
 
 import (
-	"github.com/gorilla/mux"
+	"context"
+	socketio "github.com/googollee/go-socket.io"
 	_ "github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
 	_ "github.com/gorilla/websocket"
+	"github.com/redis/go-redis/v9"
 	"log"
-	"net/http"
+	"os"
 )
 
-var upgrader = websocket.Upgrader{}
+var ctx = context.Background()
 
 func main() {
-	var client Redis
-	client.Init()
-
-	router := mux.NewRouter()
-	router.HandleFunc("/ws", func(writer http.ResponseWriter, request *http.Request) {
-		conn, err := upgrader.Upgrade(writer, request, nil)
-		if err != nil {
-			log.Printf("Failed to upgrade connection to WebSocket: %v", err)
-			return
-		}
-
-		defer conn.Close()
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: os.Getenv("REDIS_ADDR"),
 	})
+
+	server := socketio.NewServer(nil)
+	controller := NewController(*redisClient, 10)
+
+	server.OnConnect("/", func(s socketio.Conn) error {
+		controller.GetLength()
+		log.Println(controller.PageSize, controller.CurrentLen)
+		controller.Pull()
+		controller.EmitData(s)
+
+		return nil
+	})
+
+	server.OnEvent("/", "filter", func(s socketio.Conn, data FilterDto) {
+		controller.SetFilter(data)
+		controller.EmitData(s)
+	})
+
+	server.OnEvent("/", "set_page", func(s socketio.Conn, data int) {
+		controller.SetPageIndex(data)
+		controller.EmitData(s)
+	})
+
+	server.OnEvent("/", "set_size", func(s socketio.Conn, data int) {
+		controller.SetPageSize(data)
+		controller.EmitData(s)
+	})
+
+	server.OnDisconnect("disconnect", func(s socketio.Conn, reason string) {
+		controller.Filter.Applied = false
+		log.Println("Socket " + s.ID() + " disconnected!")
+	})
+
+	go func() {
+		subscriber := redisClient.Subscribe(ctx, "update")
+		defer subscriber.Close()
+
+		for {
+			_, err := subscriber.ReceiveMessage(ctx)
+			if err != nil {
+				log.Printf("Error receiving message: %v\n", err)
+				continue
+			}
+
+			controller.GetLength()
+			server.ForEach("/", "", func(conn socketio.Conn) {
+				controller.EmitLen(conn)
+				controller.EmitData(conn)
+			})
+		}
+	}()
 }
