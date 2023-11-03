@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	socketio "github.com/googollee/go-socket.io"
 	_ "github.com/gorilla/mux"
 	_ "github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
 	"log"
+	"net/http"
 	"os"
 )
 
@@ -16,6 +18,10 @@ func main() {
 	redisClient := redis.NewClient(&redis.Options{
 		Addr: os.Getenv("REDIS_ADDR"),
 	})
+
+	if redisClient == nil {
+		panic("Couldn't connect to Redis client")
+	}
 
 	server := socketio.NewServer(nil)
 	controller := NewController(*redisClient, 10)
@@ -67,4 +73,12 @@ func main() {
 			})
 		}
 	}()
+
+	// maybe first parameter should contain should be smth
+	http.Handle("/", server)
+
+	if err := http.ListenAndServe(":3001", nil); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Server is listening on port 3001")
 }
