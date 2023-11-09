@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"github.com/gin-gonic/gin"
 	socketio "github.com/googollee/go-socket.io"
 	_ "github.com/gorilla/mux"
 	_ "github.com/gorilla/websocket"
@@ -12,11 +12,30 @@ import (
 	"os"
 )
 
+func GinMiddleware(allowOrigin string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", allowOrigin)
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, Content-Length, X-CSRF-Token, Token, session, Origin, Host, Connection, Accept-Encoding, Accept-Language, X-Requested-With")
+
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Request.Header.Del("Origin")
+
+		c.Next()
+	}
+}
+
 var ctx = context.Background()
 
 func main() {
 	log.Println("Started ws_server!")
 
+	router := gin.New()
 	redisClient := redis.NewClient(&redis.Options{
 		Addr: os.Getenv("REDIS_ADDR"),
 	})
@@ -31,6 +50,7 @@ func main() {
 	controller := NewController(*redisClient, 10)
 
 	server.OnConnect("/", func(s socketio.Conn) error {
+		log.Println("WebView connected!")
 		controller.GetLength()
 		log.Println(controller.PageSize, controller.CurrentLen)
 		controller.Pull()
@@ -59,7 +79,7 @@ func main() {
 		log.Println("Socket " + s.ID() + " disconnected!")
 	})
 
-	go func() {
+	/*go func() {
 		subscriber := redisClient.Subscribe(ctx, "update")
 		defer subscriber.Close()
 
@@ -76,13 +96,22 @@ func main() {
 				controller.EmitData(conn)
 			})
 		}
-	}()
+	}()*/
 
-	// maybe first parameter should contain should be smth
-	http.Handle("/", server)
+	go server.Serve()
+	defer server.Close()
+
+	router.Use(GinMiddleware("http://localhost:3000"))
+	router.GET("/socket.io/*any", gin.WrapH(server))
+	router.POST("/socket.io/*any", gin.WrapH(server))
+
+	if err := router.Run("localhost:3001"); err != nil {
+		log.Fatal("failed run app: ", err)
+	}
+	/*http.Handle("/socket-io/", server)
 
 	fmt.Println("Server is listening on port 3001")
 	if err := http.ListenAndServe(":3001", nil); err != nil {
 		log.Fatal(err)
-	}
+	}*/
 }
