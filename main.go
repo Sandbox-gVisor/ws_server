@@ -15,12 +15,16 @@ import (
 var ctx = context.Background()
 
 func main() {
+	log.Println("Started ws_server!")
+
 	redisClient := redis.NewClient(&redis.Options{
 		Addr: os.Getenv("REDIS_ADDR"),
 	})
 
-	if redisClient == nil {
-		panic("Couldn't connect to Redis client")
+	if err := redisClient.Ping(ctx).Err(); err != nil {
+		log.Fatal("Couldn't connect to redis client: ", err)
+	} else {
+		log.Println("Successfully connected to Redis client!")
 	}
 
 	server := socketio.NewServer(nil)
@@ -77,8 +81,8 @@ func main() {
 	// maybe first parameter should contain should be smth
 	http.Handle("/", server)
 
+	fmt.Println("Server is listening on port 3001")
 	if err := http.ListenAndServe(":3001", nil); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Server is listening on port 3001")
 }
