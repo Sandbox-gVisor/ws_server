@@ -6,6 +6,6 @@ COPY . ./
 
 RUN go build
 
-EXPOSE 6379
+EXPOSE 3001
 
 CMD ["./ws_server"]

@@ -50,9 +50,8 @@ func main() {
 	controller := NewController(*redisClient, 10)
 
 	server.OnConnect("/", func(s socketio.Conn) error {
-		log.Println("WebView connected!")
+		log.Println("Connected:", s.ID())
 		controller.GetLength()
-		log.Println(controller.PageSize, controller.CurrentLen)
 		controller.Pull()
 		controller.EmitData(s)
 
@@ -79,7 +78,7 @@ func main() {
 		log.Println("Socket " + s.ID() + " disconnected!")
 	})
 
-	go func() {
+	/*go func() {
 		subscriber := redisClient.Subscribe(ctx, "update")
 		defer subscriber.Close()
 
@@ -94,7 +93,7 @@ func main() {
 			controller.EmitLen(conn)
 			controller.EmitData(conn)
 		})
-	}()
+	}()*/
 
 	go server.Serve()
 	defer server.Close()
