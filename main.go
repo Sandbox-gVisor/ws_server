@@ -74,29 +74,27 @@ func main() {
 		controller.EmitData(s)
 	})
 
-	server.OnDisconnect("disconnect", func(s socketio.Conn, reason string) {
+	server.OnDisconnect("/", func(s socketio.Conn, reason string) {
 		controller.Filter.Applied = false
 		log.Println("Socket " + s.ID() + " disconnected!")
 	})
 
-	/*go func() {
+	go func() {
 		subscriber := redisClient.Subscribe(ctx, "update")
 		defer subscriber.Close()
 
-		for {
-			_, err := subscriber.ReceiveMessage(ctx)
-			if err != nil {
-				log.Printf("Error receiving message: %v\n", err)
-				continue
-			}
-
-			controller.GetLength()
-			server.ForEach("/", "", func(conn socketio.Conn) {
-				controller.EmitLen(conn)
-				controller.EmitData(conn)
-			})
+		_, err := subscriber.ReceiveMessage(ctx)
+		if err != nil {
+			log.Printf("Error receiving message: %v\n", err)
+			return
 		}
-	}()*/
+
+		controller.GetLength()
+		server.ForEach("/", "", func(conn socketio.Conn) {
+			controller.EmitLen(conn)
+			controller.EmitData(conn)
+		})
+	}()
 
 	go server.Serve()
 	defer server.Close()
@@ -104,14 +102,9 @@ func main() {
 	router.Use(GinMiddleware("http://localhost:3000"))
 	router.GET("/socket.io/*any", gin.WrapH(server))
 	router.POST("/socket.io/*any", gin.WrapH(server))
+	router.StaticFS("/public", http.Dir("../asset"))
 
-	if err := router.Run("localhost:3001"); err != nil {
+	if err := router.Run(":3001"); err != nil {
 		log.Fatal("failed run app: ", err)
 	}
-	/*http.Handle("/socket-io/", server)
-
-	fmt.Println("Server is listening on port 3001")
-	if err := http.ListenAndServe(":3001", nil); err != nil {
-		log.Fatal(err)
-	}*/
 }
