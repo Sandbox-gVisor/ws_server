@@ -31,10 +31,19 @@ export type TLog = {
 	time: string;
 };
 
-export function messageToLog(message: TMessage) {
+export type TRowsCount = {
+	rows: string
+}
+
+export type TDbLog = {
+	id: number,
+	message: TMessage
+}
+
+export function messageToLog(msg: TDbLog) {
 	return {
-		...message.msg,
-		level: message.level,
-		time: message.time,
+		...msg.message.msg,
+		level: msg.message.level,
+		time: msg.message.time,
 	};
 }

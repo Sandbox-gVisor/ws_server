@@ -5,20 +5,21 @@ import {
 	FilterDto,
 	toTFilter,
 } from './filter';
-import {TLog, messageToLog} from './log';
+import {TLog, messageToLog, TDbLog, TRowsCount} from './log';
+import pg from "pg";
 
 export class Controller {
 	pageSize: number;
 	pageIndex: number;
 	logs: Array<TLog>;
-	len: number;
+	len: number;  // logs count
 	filter: TFilter;
 	currentLength: number; // only for filter applied
 
-	redisClient: any;
+	postgresClient: pg.Client;
 
-	constructor(redisClient: any, size: number) {
-		this.redisClient = redisClient;
+	constructor(postgresClient: any, size: number) {
+		this.postgresClient = postgresClient;
 		this.filter = defaultFilter;
 
 		this.pageSize = size;
@@ -28,37 +29,48 @@ export class Controller {
 		this.currentLength = 0;
 	}
 
-	async setFilter(filter: FilterDto) {
+	// in key-value realization of this func we were picking each log from storage, then
+	// converting them into TLog and checking whether the log was fitting the current filter
+	async applyFilter(filter: FilterDto, socket: any) {
 		this.filter = toTFilter(filter);
-		let newLen: number = 0;
-		for (let i = 0; i < this.len; ++i) {
-			const msg = await this.loadMsg('', i);
-			if (!msg) continue;
-			const log: TLog = messageToLog(msg);
-			if (checkSuggest(log, this.filter)) {
-				await this.redisClient.set('f' + newLen, JSON.stringify(msg));
-				newLen++;
-			}
-		}
-		this.currentLength = newLen;
+		const { levels, types, prefix, taskname, syscallname } = this.filter;
+
+		const query = `SELECT * 
+                           	  FROM messages 
+                           	  WHERE TRUE ${levels.length > 0 ? `AND message->>'level' IN ('${levels.join('\',\'')}')` : ''}
+                                 ${types.length > 0 ? `AND message->'msg'->>'LogType' IN ('${types.join('\',\'')}')` : ''}
+                                 ${prefix ? `AND message->'msg'->>'LogPrefix' ~ '${prefix.source}'` : ''}
+                                 ${taskname ? `AND message->'msg'->>'Taskname' ~ '${taskname.source}'` : ''}
+                                 ${syscallname ? `AND message->'msg'->>'Syscallname' ~ '${syscallname.source}'` : ''}`;
+
+		await this.postgresClient.query(query).then(rows => {
+			this.logs = rows.rows;
+			this.currentLength = <number>rows.rowCount
+		});
+		this.emitLen(socket);
+		socket.emit('data', this.logs);
 	}
 
-	async loadMsg(prefix: string, i: number) {
-		const msg = await this.redisClient.get(prefix + i);
-		return JSON.parse(msg);
+	// loadMsg gets logs from database by row's index
+	async loadMsg(i: number) {
+		const msg : TDbLog = await this.postgresClient.query('SELECT * FROM messages WHERE id = $1', [i])
+			.then(res => res.rows[0])
+
+		return msg
 	}
 
-	async pull(prefix: string) {
+	async pull() {
 		const start = this.pageIndex * this.pageSize;
 		const finish = Math.min(start + this.pageSize, this.currentLength);
 
 		let newLogs: Array<TLog> = [];
 		for (let i = start; i < finish; ++i) {
-			const msg = await this.loadMsg(prefix, i);
+			const msg = await this.loadMsg(i);
+			//console.log(msg)
 			if (msg) {
 				newLogs.push(messageToLog(msg));
 			} else {
-				console.log("can't parse json");
+				console.log("can't parse json:");
 			}
 		}
 		this.logs = newLogs;
@@ -67,11 +79,7 @@ export class Controller {
 	/** pull()
 	 * Read data, apply filters */
 	async Pull() {
-		if (this.filter.applied) {
-			await this.pull('f');
-		} else {
-			await this.pull('');
-		}
+		await this.pull();
 	}
 
 	async setPageSize(size: number) {
@@ -85,7 +93,10 @@ export class Controller {
 	}
 
 	async getLength() {
-		this.len = await this.redisClient.get('length');
+		const result : TRowsCount = await this.postgresClient.query(`SELECT COUNT(*) rows FROM messages`)
+			.then(res => res.rows[0]);
+
+		this.len = parseInt(result.rows, 10)
 		this.currentLength = this.len;
 	}
 
