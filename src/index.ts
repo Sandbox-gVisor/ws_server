@@ -27,7 +27,8 @@ io.on('connection', async (socket) => {
 
 	socket.on('filter', async (data) => {
 		console.log("Got filter request")
-		await controller.applyFilter(data, socket);
+		await controller.setFilter(data);
+		await controller.emitData(socket);
 	});
 
 	socket.on('set_page', async (data) => {

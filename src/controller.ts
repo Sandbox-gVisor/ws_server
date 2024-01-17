@@ -29,10 +29,16 @@ export class Controller {
 		this.currentLength = 0;
 	}
 
+	// added this
+	async setFilter(filter: FilterDto) {
+		this.filter = toTFilter(filter);
+
+		await this.applyFilter()
+	}
+
 	// in key-value realization of this func we were picking each log from storage, then
 	// converting them into TLog and checking whether the log was fitting the current filter
-	async applyFilter(filter: FilterDto, socket: any) {
-		this.filter = toTFilter(filter);
+	async applyFilter() {
 		const { levels, types, prefix, taskname, syscallname } = this.filter;
 		const start = this.pageIndex * this.pageSize;
 		const finish = Math.min(start + this.pageSize, this.currentLength);
@@ -45,15 +51,6 @@ export class Controller {
                                  ${taskname ? `AND message->'msg'->>'Taskname' ~ '${taskname.source === '\\/(?:)\\/' ? '' : taskname.source}'` : ''}
                                  ${syscallname ? `AND message->'msg'->>'Syscallname' ~ '${syscallname.source === '\\/(?:)\\/' ? '' : syscallname.source}'` : ''}`;
 
-		/*const dbLogs : TDbLog = await this.postgresClient.query(query).then(result => {
-			result.rows.forEach(row => {
-				delete row.id
-			})
-
-			this.logs = result.rows;
-			this.currentLength = <number>result.rowCount
-		});*/
-
 		const dbLogs : Array<TDbLog> = await this.postgresClient.query(query).then(result => result.rows)
 		const filteredLogs : Array<TLog> = []
 		for (let i = start; i < finish; ++i)
@@ -64,8 +61,8 @@ export class Controller {
 		}
 
 		this.logs = filteredLogs;
-		this.emitLen(socket);
-		socket.emit('data', this.logs);
+		//this.emitLen(socket);
+		//socket.emit('data', this.logs);
 	}
 
 	// loadMsg gets logs from database by row's index
@@ -98,7 +95,12 @@ export class Controller {
 	/** pull()
 	 * Read data, apply filters */
 	async Pull() {
-		await this.pull();
+		// changed this
+		if (this.filter.applied) {
+			await this.applyFilter();
+		} else {
+			await this.pull();
+		}
 	}
 
 	async setPageSize(size: number) {
