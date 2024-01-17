@@ -26,6 +26,7 @@ io.on('connection', async (socket) => {
 	await controller.emitData(socket);
 
 	socket.on('filter', async (data) => {
+		console.log("Got filter request")
 		await controller.applyFilter(data, socket);
 	});
 

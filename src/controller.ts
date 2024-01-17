@@ -34,19 +34,36 @@ export class Controller {
 	async applyFilter(filter: FilterDto, socket: any) {
 		this.filter = toTFilter(filter);
 		const { levels, types, prefix, taskname, syscallname } = this.filter;
+		const start = this.pageIndex * this.pageSize;
+		const finish = Math.min(start + this.pageSize, this.currentLength);
 
 		const query = `SELECT * 
                            	  FROM messages 
                            	  WHERE TRUE ${levels.length > 0 ? `AND message->>'level' IN ('${levels.join('\',\'')}')` : ''}
                                  ${types.length > 0 ? `AND message->'msg'->>'LogType' IN ('${types.join('\',\'')}')` : ''}
-                                 ${prefix ? `AND message->'msg'->>'LogPrefix' ~ '${prefix.source}'` : ''}
-                                 ${taskname ? `AND message->'msg'->>'Taskname' ~ '${taskname.source}'` : ''}
-                                 ${syscallname ? `AND message->'msg'->>'Syscallname' ~ '${syscallname.source}'` : ''}`;
+                                 ${prefix ? `AND message->'msg'->>'LogPrefix' ~ '${prefix.source === '\\/(?:)\\/' ? '' : prefix.source}'` : ''}
+                                 ${taskname ? `AND message->'msg'->>'Taskname' ~ '${taskname.source === '\\/(?:)\\/' ? '' : taskname.source}'` : ''}
+                                 ${syscallname ? `AND message->'msg'->>'Syscallname' ~ '${syscallname.source === '\\/(?:)\\/' ? '' : syscallname.source}'` : ''}`;
 
-		await this.postgresClient.query(query).then(rows => {
-			this.logs = rows.rows;
-			this.currentLength = <number>rows.rowCount
-		});
+		/*const dbLogs : TDbLog = await this.postgresClient.query(query).then(result => {
+			result.rows.forEach(row => {
+				delete row.id
+			})
+
+			this.logs = result.rows;
+			this.currentLength = <number>result.rowCount
+		});*/
+
+		const dbLogs : Array<TDbLog> = await this.postgresClient.query(query).then(result => result.rows)
+		const filteredLogs : Array<TLog> = []
+		for (let i = start; i < finish; ++i)
+		{
+			if (i == 0) continue
+
+			filteredLogs.push(messageToLog(dbLogs[i]))
+		}
+
+		this.logs = filteredLogs;
 		this.emitLen(socket);
 		socket.emit('data', this.logs);
 	}
@@ -65,12 +82,14 @@ export class Controller {
 
 		let newLogs: Array<TLog> = [];
 		for (let i = start; i < finish; ++i) {
+			if (i == 0) continue
+
 			const msg = await this.loadMsg(i);
-			//console.log(msg)
 			if (msg) {
 				newLogs.push(messageToLog(msg));
 			} else {
 				console.log("can't parse json:");
+				console.log(msg)
 			}
 		}
 		this.logs = newLogs;
