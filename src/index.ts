@@ -2,18 +2,14 @@ import express from 'express';
 import {createServer} from 'http';
 import {Server} from 'socket.io';
 
-import {createClient} from 'redis';
+import pg from 'pg';
 import {Controller} from './controller';
 
-const client = createClient({url: process.env.REDIS_ADDR});
 
-client.on('error', (err) => console.log('Redis Client Error', err));
-const fetchClient = async () => {
-	await client.connect();
-};
-fetchClient().catch(console.error);
+const pgClient = new pg.Client(process.env.POSTGRES_ADDR);
+pgClient.connect().then(() => console.log("Connected to Database")).catch(err => console.log(err))
 
-const controller: Controller = new Controller(client, 10);
+const controller: Controller = new Controller(pgClient, 10);
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -30,6 +26,7 @@ io.on('connection', async (socket) => {
 	await controller.emitData(socket);
 
 	socket.on('filter', async (data) => {
+		console.log("Got filter request")
 		await controller.setFilter(data);
 		await controller.emitData(socket);
 	});
@@ -51,10 +48,9 @@ io.on('connection', async (socket) => {
 });
 
 (async () => {
-	const subscriber = client.duplicate();
-	await subscriber.connect();
+	await pgClient.query('LISTEN update');
 
-	await subscriber.subscribe('update', async () => {
+	pgClient.on('notification', async () => {
 		await controller.getLength();
 		controller.emitLen(io.sockets);
 		await controller.emitData(io.sockets);
