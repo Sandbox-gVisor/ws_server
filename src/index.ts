@@ -7,7 +7,7 @@ import {Controller} from './controller';
 
 
 const pgClient = new pg.Client(process.env.POSTGRES_ADDR);
-pgClient.connect()
+pgClient.connect().then(() => console.log("Connected to Database")).catch(err => console.log(err))
 
 const controller: Controller = new Controller(pgClient, 10);
 const app = express();
